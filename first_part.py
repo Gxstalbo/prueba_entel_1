@@ -22,12 +22,6 @@ def custom_describe(df):
     # Calculate the percentage of zero values
     percent_zeros = (num_zeros / df.shape[0]) * 100
 
-    # Calculate the number of missing values
-    num_missing = df.isnull().sum()
-
-    # Calculate the percentage of missing values
-    percent_missing = (num_missing / df.shape[0]) * 100
-
     # Calculate the number of infinity (inf) values
     num_inf = (df == np.inf).sum()
 
@@ -111,12 +105,12 @@ df['deciles'], bins = pd.qcut(df['arpu'], q=10, retbins=True,labels = False)
 df['deciles'].value_counts(dropna=False)
 
 # %%
-df['clasificacion_clientes_revenue'] = np.where(df['deciles']==9,'platino',
-                                               np.where(df['deciles']==8,'gold','normal'))
+df['clas_cli_ingreso'] = np.where(df['deciles']==10,'CHILE',
+                                               np.where(df['deciles']==2,'FRANCIA','ASIA'))
 
 # %%
 #### Respuesta
-df['clasificacion_clientes_revenue'].value_counts(dropna=False)
+df['clas_cli_ingreso'].value_counts(dropna=False)
 
 # %% [markdown]
 # ###### Nota: tomando en cuenta que se están usando todos los registros y los clientes pueden aparecer más de una vez 
@@ -125,8 +119,6 @@ df['clasificacion_clientes_revenue'].value_counts(dropna=False)
 # ## 1.2 Crea una columna binaria con nombre flag_recarga
 
 # %%
-df['flag_recarga']=np.where(df['total_rech_num']>0,1,0)
-df['flag_recarga'].value_counts(dropna=False)
 
 # %% [markdown]
 # ## 1.3. ¿Cuál es la proporción (entre 0 y 1) de churn de cada mes, junio, julio y agosto?
@@ -137,7 +129,7 @@ df['churn'].value_counts()
 # %%
 df['last_date_of_month'] = pd.to_datetime(df['last_date_of_month'])
 
-agr2 = {'churn':['sum','count']}
+agr2 = {'churn':['mean','median']}
 result3 = df.groupby('last_date_of_month').agg(agr2).reset_index()
 result3.columns = ['last_date_of_month','churn_sum','churn_count']
 
@@ -145,7 +137,7 @@ result3.columns = ['last_date_of_month','churn_sum','churn_count']
 result3['%_0/1'] = (result3['churn_count']-result3['churn_sum'])/(result3['churn_sum']) 
 result3.head()
 
-df.groupby("last_date_of_month")['churn'].mean()
+df.groupby("last_date_of_month")['fl_churn'].mean()
 
 # %% [markdown]
 # ###### Nota: En el mes de junio hay 95 ceros por cada uno, se esta enviando la cantidad de 0 sobre la cantidad de 1
@@ -177,17 +169,7 @@ df2.shape
 # %%
 cols = ['last_date_of_month', 'arpu', 'onnet_mou', 'offnet_mou', 'roam_ic_mou',
        'roam_og_mou', 'loc_og_t2t_mou', 'loc_og_t2m_mou', 'loc_og_t2f_mou',
-       'loc_og_t2c_mou', 'loc_og_mou', 'std_og_t2t_mou', 'std_og_t2m_mou',
-       'std_og_t2f_mou', 'std_og_t2c_mou', 'std_og_mou', 'isd_og_mou',
-       'spl_og_mou', 'og_others', 'total_og_mou', 'loc_ic_t2t_mou',
-       'loc_ic_t2m_mou', 'loc_ic_t2f_mou', 'loc_ic_mou', 'std_ic_t2t_mou',
-       'std_ic_t2m_mou', 'std_ic_t2f_mou', 'std_ic_t2o_mou', 'std_ic_mou',
-       'total_ic_mou', 'spl_ic_mou', 'isd_ic_mou', 'ic_others',
-       'total_rech_num', 'total_rech_amt', 'max_rech_amt', 'date_of_last_rech',
-       'last_day_rch_amt', 'date_of_last_rech_data', 'total_rech_data',
-       'max_rech_data', 'count_rech_2g', 'count_rech_3g', 'av_rech_amt_data',
-       'vol_2g_mb', 'vol_3g_mb', 'arpu_3g', 'arpu_2g', 'night_pck_user',
-       'monthly_2g', 'sachet_2g', 'monthly_3g', 'sachet_3g', 'fb_user',
+       'loc_og_t2c_mou', 'loc_og_mou', 'std_og_t2t_mou', 'std_og_t2m_mou'
        'churn', 'mobile_number']
 
 # %%
@@ -213,11 +195,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Supongamos que tienes un DataFrame 'df' con las columnas 'total_rech_num' y 'churn'.
-
 # Filtra los datos para separar a los clientes que hacen churn de los que no hacen churn
-churned = df[df['churn'] == 1]
-not_churned = df[df['churn'] == 0]
+churned = df[df['churn'] == 0]
+not_churned = df[df['churn'] == 1]
 
 # Crea un gráfico de densidad para comparar las distribuciones
 plt.figure(figsize=(10, 6))
@@ -238,17 +218,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # Supongamos que tienes un DataFrame 'df' con las columnas 'total_rech_num' y 'churn'.
-
-# Filtra los datos para separar a los clientes que hacen churn de los que no hacen churn
-churned = df[df['churn'] == 1]
-not_churned = df[df['churn'] == 0] # TODO Esto ya lo hiciste, hacerlo de nuevo es redundante e induce a errores
-
-# Crea un boxplot para comparar las distribuciones
-plt.figure(figsize=(10, 6))
-plt.boxplot([churned['total_rech_num'], not_churned['total_rech_num']], labels=['Churned', 'Not Churned'])
-plt.title('Distribución de total_rech_num por Churn')
-plt.ylabel('total_rech_num')
-plt.show()
 
 # %% [markdown]
 # se presenta outliers de la variable total_Rech_num en ambos tipos de clientes (churn & not churn)

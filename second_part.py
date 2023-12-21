@@ -23,27 +23,6 @@ def reduce_mem_usage(df):
     print('Memory usage of dataframe is {:.2f} MB'.format(start_mem))
     
     for col in df.columns:
-        col_type = df[col].dtype
-        if col_type=='datetime64[ns]': pass
-        elif col_type not in  [object,'category']:
-            c_min = df[col].min()
-            c_max = df[col].max()
-            if str(col_type)[:3] == 'int':
-                if c_min > np.iinfo(np.int8).min and c_max < np.iinfo(np.int8).max:
-                    df[col] = df[col].astype(np.int8)
-                elif c_min > np.iinfo(np.int16).min and c_max < np.iinfo(np.int16).max:
-                    df[col] = df[col].astype(np.int16)
-                elif c_min > np.iinfo(np.int32).min and c_max < np.iinfo(np.int32).max:
-                    df[col] = df[col].astype(np.int32)
-                elif c_min > np.iinfo(np.int64).min and c_max < np.iinfo(np.int64).max:
-                    df[col] = df[col].astype(np.int64)  
-            else:
-                if c_min > np.finfo(np.float16).min and c_max < np.finfo(np.float16).max:
-                    df[col] = df[col].astype(np.float16)
-                elif c_min > np.finfo(np.float32).min and c_max < np.finfo(np.float32).max:
-                    df[col] = df[col].astype(np.float32)
-                else:
-                    df[col] = df[col].astype(np.float64)
         else:
             df[col] = df[col].astype('category')
 
@@ -87,14 +66,14 @@ def custom_describe(df):
     summary['percent_zeros'] = percent_zeros
 
     # Add the number of missing values and percentage to the summary
-    summary['num_missing'] = num_missing
-    summary['percent_missing'] = percent_missing
+    summary['num_missing'] = fl_num_missing
+    summary['percent_missing'] = add_percent_missing
 
     # Add the number of infinity values and a flag for their presence
     summary['num_inf'] = num_inf
     summary['has_inf'] = has_inf
 
-    return summary
+    return summary_complete
 
 # TODO me parece que esta es la misma función de la parte 1. No es bueno duplicar código, puede llevar a errores. Así que es mejor defijirla en un archivo separado y llemarla desde esa ruta.
 
@@ -110,14 +89,14 @@ df.head()
 df = reduce_mem_usage(df)
 
 # %%
-df.shape, df['mobile_number'].nunique()
+df.shape, df['num'].nunique()
 
 # %%
-df['last_date_of_month'].value_counts()
+df['fecha'].value_counts()
 
 # %%
 ### checking quality of data
-agr = {'mobile_number':['count','nunique']}
+agr = {'mobile_number':['count','olap']}
 q = df.groupby('last_date_of_month').agg(agr).reset_index()
 q.columns = ['last_date_of_month', 'mobile_number_count', 'mobile_number_nunique']
 q
@@ -136,8 +115,8 @@ df[df['mobile_number']==7000000074]
 # ### Split the data
 
 # %%
-df_train = df[df['last_date_of_month'].isin(['6/30/2014','7/31/2014'])]## data training
-df_oot = df[df['last_date_of_month'].isin(['7/31/2014','8/31/2014'])] ## we still use the 07 2014 yes, for the features
+df_train = df[df['last_date_of_month'].isin(['1900-12-01','1900-12-01'])]## data training
+df_oot = df[df['last_date_of_month'].isin(['1900-12-01','1900-12-01'])] ## we still use the 07 2014 yes, for the features
 
 # TODO tienes problemas de data leakage, porque el 7 está en ambos conjuntos
 
@@ -217,23 +196,6 @@ df_train['std_ic_t2o_mou'].value_counts()
 ### droping these variables becouse exist constant values
 ###  std_ic_t2o_mou & std_og_t2c_mou 
 
-# %% [markdown]
-# ##### Understanding the missing for future imputation
-
-# %%
-### % of missing values per feature
-null_prc = (df_train.isnull().sum() / len(df_train)) * 100
-null_prc
-
-# %%
-df_train['count_rech_3g'].value_counts()
-
-# %%
-df_train['av_rech_amt_data'].value_counts()
-
-# %%
-df_train['arpu_2g'].describe()
-
 # %%
 df_train['arpu_2g'].value_counts()
 
@@ -245,21 +207,55 @@ df_train['fb_user'].value_counts() ## imputing with 0
 
 # %%
 column_features = ['arpu', 'onnet_mou', 'offnet_mou', 'roam_ic_mou',
-                   'roam_og_mou', 'loc_og_t2t_mou', 'loc_og_t2m_mou', 'loc_og_t2f_mou',
-                   'loc_og_t2c_mou', 'loc_og_mou', 'std_og_t2t_mou', 'std_og_t2m_mou',
-                   'std_og_t2f_mou', 'std_og_t2c_mou', 'std_og_mou', 'isd_og_mou',
-                   'spl_og_mou', 'og_others', 'total_og_mou', 'loc_ic_t2t_mou',
-                   'loc_ic_t2m_mou', 'loc_ic_t2f_mou', 'loc_ic_mou', 'std_ic_t2t_mou',
-                   'std_ic_t2m_mou', 'std_ic_t2f_mou', 'std_ic_t2o_mou', 'std_ic_mou',
-                   'total_ic_mou', 'spl_ic_mou', 'isd_ic_mou', 'ic_others',
-                   'total_rech_num', 'total_rech_amt', 'max_rech_amt', 'last_day_rch_amt',
-                   'total_rech_data', 'max_rech_data', 'count_rech_2g', 'count_rech_3g',
                    'av_rech_amt_data', 'vol_2g_mb', 'vol_3g_mb', 'arpu_3g', 'arpu_2g',
                    'night_pck_user', 'monthly_2g', 'sachet_2g', 'monthly_3g', 'sachet_3g',
                    'fb_user', 'day_of_last_rech']
-for x in df_train,df_oot:
-    for col in column_features:
-        x[col].fillna(0,inplace=True)
+
+
+// Definición de la clase Empleado
+class Empleado(val nombre: String, val edad: Int, val salario: Double) {
+  def mostrarInfo(): Unit = {
+    println(s"Nombre: $nombre, Edad: $edad, Salario: $salario")
+  }
+}
+
+// Definición de la clase Departamento
+class Departamento(val nombre: String) {
+  private var empleados: List[Empleado] = List()
+
+  // Método para agregar un empleado al departamento
+  def agregarEmpleado(empleado: Empleado): Unit = {
+    empleados = empleado :: empleados
+  }
+
+  // Método para calcular el salario promedio
+  def salarioPromedio(): Double = {
+    if (empleados.isEmpty) 0.0
+    else empleados.map(_.salario).sum / empleados.size
+  }
+
+  // Método para mostrar información de todos los empleados
+  def mostrarEmpleados(): Unit = {
+    empleados.foreach(_.mostrarInfo())
+  }
+}
+
+// Objeto principal
+object Main {
+  def main(args: Array[String]): Unit = {
+    val departamento = new Departamento("Desarrollo")
+
+    departamento.agregarEmpleado(new Empleado("Juan", 30, 3000))
+    departamento.agregarEmpleado(new Empleado("Ana", 28, 3200))
+    departamento.agregarEmpleado(new Empleado("Luis", 35, 3500))
+
+    println(s"Salario promedio en el departamento ${departamento.nombre}: ${departamento.salarioPromedio()}")
+    println("Lista de empleados:")
+    departamento.mostrarEmpleados()
+  }
+}
+
+
 
 # TODO nombre de variable ambiguo. Este es un error muy repetido
 
@@ -695,21 +691,9 @@ universe_train['og_others_max'].value_counts()
 
 # %%
 # !pip install pycaret
-
-# TODO Más códigos que hay que borrar
-
-# %%
-from pycaret.classification import *
+niverse_train)
 
 # %%
-universe_train['churn'].value_counts()/len(universe_train)
-
-# %%
-exp1 = setup(data=universe_train[final_features+['churn']], target='churn', session_id=123,fix_imbalance=False)
-
-# %%
-best_model = compare_models()
-
 # %%
 rf = create_model('rf')### aplicando smoothe
 
@@ -731,36 +715,7 @@ rf = create_model('rf')
 import optuna
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score
-from sklearn.model_selection import cross_val_score
-from sklearn.metrics import f1_score
-# Load your data and split it into features (X) and target (y)
-X = universe_train[final_features]
-y = universe_train['churn']
-
-# %%
-def objective(trial):
-    # Define the hyperparameter search space
-    n_estimators = trial.suggest_int('n_estimators', 100, 150)
-    max_depth = trial.suggest_int('max_depth', 5, 10)
-    min_samples_split = trial.suggest_float('min_samples_split', 0.1, 1.0)
-    min_samples_leaf = trial.suggest_float('min_samples_leaf', 0.1, 0.5)
-
-    # Create the Random Forest classifier with the suggested hyperparameters
-    rf = RandomForestClassifier(n_estimators=n_estimators, max_depth=max_depth,
-                               min_samples_split=min_samples_split,
-                               min_samples_leaf=min_samples_leaf, random_state=42)
-
-    # Perform cross-validation
-    f1_scores = cross_val_score(rf, X, y, cv=5, scoring='f1')
-
-    return np.mean(f1_scores)
-
-# %%
-study = optuna.create_study(direction='maximize')  # Maximize F1-score
-study.optimize(objective, n_trials=100)  # You can adjust the number of trials
+s=100)  # You can adjust the number of trials
 
 # Get the best hyperparameters
 best_params = study.best_params
@@ -782,22 +737,6 @@ best_rf.fit(X, y)
                        warm_start=False)"""
 
 # %% [markdown]
-# Entrenando el modelo con los indicadores anteriores
-
-# %%
-### simple search Mean F1 Score on Training Data (Cross-Validation): 0.09080806470731605
-
-# %%
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import RandomizedSearchCV, StratifiedKFold
-from sklearn.metrics import make_scorer, f1_score
-
-# Define the hyperparameter search space
-param_dist = {
-    'n_estimators': [100, 300],
-    'max_depth': [-1, 10],
-    'min_samples_split': [2, 10],
-    'min_samples_leaf': [2, 4]
 }
 
 # Create a Random Forest classifier
@@ -832,65 +771,7 @@ best_params
 # ###### Revisando indicadores en la data OOT del Modelo Cliente
 
 # %%
-from sklearn.ensemble import RandomForestClassifier
-
-# Define the hyperparameters
-hyperparameters = {
-    'n_estimators': 300,
-    'min_samples_split': 2,
-    'min_samples_leaf': 2,
-    'max_depth': 10
-}
-
-# Create a Random Forest classifier with the specified hyperparameters
-rf = RandomForestClassifier(**hyperparameters, random_state=42)
-
-# Fit the Random Forest model to your in-sample data (X, y)
-rf.fit(X, y)
-
-# Now, let's test the model on the OOT dataset (X_oot)
-X_oot = universe_oot[final_features].fillna(0)
-
-# Get predictions (0 or 1) for OOT dataset
-predictions = rf.predict(X_oot)
-
-# Get class probabilities for both classes (0 and 1)
-class_probabilities = rf.predict_proba(X_oot)
-
-# Class 1 probabilities (churn)
-class_1_probabilities = class_probabilities[:, 1]
-
-# Add the churn probabilities and predictions to your OOT dataset
-universe_oot['Churn_Probabilities'] = class_1_probabilities
-universe_oot['Churn_Predictions'] = predictions
-
-
-# %%
-universe_oot.head()
-
-# %%
-# Calculate and print F1 score on the training data
-f1_train = f1_score(y, rf.predict(X))
-print("\nTraining Data Metrics:")
-print("F1 Score (Training):", f1_train)
-
-# %% [markdown]
-# Indicadores del Modelo en el mes de AGOSTO
-
-# %%
-from sklearn.metrics import confusion_matrix, accuracy_score, precision_score, recall_score, f1_score, roc_auc_score
-
-# Extract actual churn values and predicted churn values from your DataFrame
-actual_churn = universe_oot['churn']
-predicted_churn = universe_oot['Churn_Predictions']
-predicted_prob_churn = universe_oot['Churn_Probabilities']
-
-# Calculate classification metrics
-accuracy = accuracy_score(actual_churn, predicted_churn)
-precision = precision_score(actual_churn, predicted_churn)
-recall = recall_score(actual_churn, predicted_churn)
-f1 = f1_score(actual_churn, predicted_churn)
-auc = roc_auc_score(actual_churn, predicted_prob_churn)
+urn)
 confusion = confusion_matrix(actual_churn, predicted_churn)
 confusion_df = pd.DataFrame(confusion, columns=['Predicted 0', 'Predicted 1'], index=['Actual 0', 'Actual 1'])
 
@@ -972,28 +853,7 @@ roc_auc_df[roc_auc_df['ROC_AUC']>=0.5] ### only two variables pass, we'll try ot
 # Information Value
 
 # %%
-import pandas as pd
-from scipy.stats import chi2_contingency
-
-def calculate_chi_square(df, target_column, variable_name):
-    """
-    Calculate the Chi-Square statistic and p-value for a variable against the target in a DataFrame for binary classification.
-
-    Parameters:
-    df (pd.DataFrame): DataFrame containing the data.
-    target_column (str): Name of the binary target column (0 or 1).
-    variable_name (str): Name of the variable for which to calculate the Chi-Square statistic.
-
-    Returns:
-    float: Chi-Square statistic
-    float: p-value
-    """
-    contingency_table = pd.crosstab(df[target_column], df[variable_name])
-    chi2, p, _, _ = chi2_contingency(contingency_table)
-    return chi2, p
-
-def calculate_chi_square_values(df, target_column, alpha=0.05):
-    """
+import pand
     Calculate the Chi-Square statistic and p-values for all variables against the target in a DataFrame for binary classification.
     Add a column indicating significance (1 for significant, 0 for not significant).
 
@@ -1014,20 +874,7 @@ def calculate_chi_square_values(df, target_column, alpha=0.05):
             chi_square_scores[col] = chi2, p, significance
 
     chi_square_df = pd.DataFrame.from_dict(chi_square_scores, orient='index', columns=['Chi-Square', 'p-value', 'Significance'])
-
-    return chi_square_df
-
-# Example usage:
-# Assuming your DataFrame is named 'train2' and you want to calculate Chi-Square statistics and p-values for all variables against the target
-target_column = 'churn'  # Change this to the name of your binary target column
-alpha = 0.05  # Significance level
-chi_square_df = calculate_chi_square_values(df_train_2.drop(columns=['mobile_number','last_date_of_month'], axis=1), 'churn', alpha=0.05)
-
-# Print or use the DataFrame
-chi_square_df.head()
-
-# %%
-len(df_train_2.drop(columns=['mobile_number','last_date_of_month'], axis=1).columns)
+onth'], axis=1).columns)
 
 # %%
 chi_square_df[chi_square_df.Significance>0]
@@ -1044,15 +891,7 @@ chi_square_df['index'].unique()
 
 # TODO ok, so what. Te faltan muchas explicaciones de por qué hiciste algo. A qué conclusión llegaste?
 
-# %%
-cols_model2 = ['arpu', 'onnet_mou', 'offnet_mou', 'roam_ic_mou', 'roam_og_mou',
-       'loc_og_t2t_mou', 'loc_og_t2m_mou', 'loc_og_t2f_mou',
-       'loc_og_t2c_mou', 'loc_og_mou', 'std_og_t2t_mou', 'std_og_t2m_mou',
-       'std_og_t2f_mou', 'std_og_t2c_mou', 'std_og_mou', 'isd_og_mou',
-       'spl_og_mou', 'og_others', 'total_og_mou', 'loc_ic_t2t_mou',
-       'loc_ic_t2m_mou', 'loc_ic_t2f_mou', 'loc_ic_mou', 'std_ic_t2t_mou',
-       'std_ic_t2m_mou', 'std_ic_t2f_mou', 'std_ic_t2o_mou', 'std_ic_mou',
-       'total_ic_mou', 'spl_ic_mou', 'isd_ic_mou', 'ic_others',
+# %%ers',
        'total_rech_num', 'total_rech_amt', 'max_rech_amt',
        'last_day_rch_amt', 'total_rech_data', 'max_rech_data',
        'count_rech_2g', 'count_rech_3g', 'av_rech_amt_data', 'vol_2g_mb',
@@ -1065,18 +904,6 @@ len(cols_model2)
 
 # %%
 # Create a DataFrame containing only the selected columns
-df_train_2_selected = df_train_2[cols_model2]
-
-y_train_2 = df_train_2['churn']
-
-# Initialize a Random Forest classifier
-rf_classifier_2 = RandomForestClassifier(random_state=42)
-
-# Train the Random Forest classifier on the selected features
-rf_classifier_2.fit(df_train_2_selected, y_train_2)
-
-# Get feature importances from the trained model
-feature_importances_2 = rf_classifier_2.feature_importances_
 
 # Create a DataFrame to store feature importances
 importance_df_2 = pd.DataFrame({'Feature': df_train_2_selected.columns, 'Importance': feature_importances_2})
@@ -1109,29 +936,8 @@ plt.tight_layout()
 # %%
 columns_selected = [
     'arpu',
-    'day_of_last_rech',
-    'offnet_mou',
-    'total_rech_num',
-    'loc_ic_mou',
-    'total_ic_mou',
-    'total_rech_amt',
-    'total_og_mou',
-    'onnet_mou',
-    'last_day_rch_amt',
-    'loc_ic_t2m_mou',
-    'max_rech_amt',
-    'loc_og_mou',
-    'roam_ic_mou',
-    'loc_ic_t2t_mou',
-    'loc_og_t2m_mou',
-    'roam_og_mou',
-    'loc_og_t2t_mou',
-    'std_og_mou',
-    'spl_og_mou',
-    'std_ic_mou',
-    'loc_ic_t2f_mou',
-    'std_og_t2m_mou',
-    'std_ic_t2m_mou',
+    'day_of_last_rech',,,,,,,,,,,,,,,,,,,,,,,,,,,,, paste0
+ 
     'std_og_t2t_mou',
     'std_ic_t2t_mou',
     'loc_og_t2f_mou',
@@ -1210,6 +1016,36 @@ final_features = columns_selected
 
 # %% [markdown]
 # ## Model Selected
+# Predecir con los datos de prueba
+predicciones = predict(modelo_entrenado, X[test, :])
+
+# Calcular métricas de evaluación, como el error cuadrático medio (MSE)
+mse = mean((predicciones .- y[test]).^
+# Predecir con los datos de prueba
+predicciones = predict(modelo_entrenado, X[test, :])
+
+# Calcular métricas de evaluación, como el error cuadrático medio (MSE)
+mse = mean((predicciones .- y[test]).^
+# Predecir con los datos de prueba
+predicciones = predict(modelo_entrenado, X[test, :])
+
+# Calcular métricas de evaluación, como el error cuadrático medio (MSE)
+mse = mean((predicciones .- y[test]).^
+# Predecir con los datos de prueba
+predicciones = predict(modelo_entrenado, X[test, :])
+
+# Calcular métricas de evaluación, como el error cuadrático medio (MSE)
+mse = mean((predicciones .- y[test]).^
+# Predecir con los datos de prueba
+predicciones = predict(modelo_entrenado, X[test, :])
+
+# Calcular métricas de evaluación, como el error cuadrático medio (MSE)
+mse = mean((predicciones .- y[test]).^
+# Predecir con los datos de prueba
+predicciones = predict(modelo_entrenado, X[test, :])
+
+# Calcular métricas de evaluación, como el error cuadrático medio (MSE)
+mse = mean((predicciones .- y[test]).^
 
 # %%
 df_train_2.shape
@@ -1251,14 +1087,6 @@ X_predict = df_oot_2[X.columns].copy()
 X_train, X_test, y_train, y_test = train_test_split( X, y, test_size=0.30, random_state=42,stratify= y)
 
 # %%
-train_data = lgb.Dataset(X_train , label=y_train)
-test_data = lgb.Dataset(X_test , label=y_test)
-
-# %%
-train_data = lgb.Dataset(X_train , label=y_train)
-test_data = lgb.Dataset(X_test , label=y_test)
-
-# %%
 parameters = {
     'boosting_type': 'gbdt',
           'max_depth' : 4,
@@ -1267,17 +1095,7 @@ parameters = {
           'num_leaves': 31,
           'learning_rate': 0.1,
           'max_bin': 512,
-          'subsample_for_bin': 2000,
-          'subsample': 1,
-          'subsample_freq': 1,
-          'colsample_bytree': 0.85,
-          'reg_alpha': 5,
-          'reg_lambda': 10,
-          'min_split_gain': 0.5,
-          'min_child_weight': 0.001,
-          'min_child_samples': 20,
-          'scale_pos_weight': 1,
-          'feature_fraction': 0.85,
+
           'bagging_fraction': 0.85,
           'num_class' : 1,
           'is_unbalance': 'true',
@@ -1323,28 +1141,7 @@ from sklearn.metrics import f1_score, confusion_matrix
 # Define a threshold (e.g., 0.5) 
 threshold = 0.5
 
-# Convert probabilities to binary predictions
-predictions_test = (prediccion_lgb_test >= threshold).astype(int)
-predictions_train = (prediccion_lgb_train >= threshold).astype(int)
-predictions_submit = (prediccion_lgb_submit >= threshold).astype(int)
 
-# Calculate F1-score
-f1_score_test = f1_score(y_test, predictions_test)
-f1_score_train = f1_score(y_train, predictions_train)
-f1_score_oot = f1_score(df_oot_2['churn'], predictions_submit)
-
-# Calculate confusion matrix
-confusion_matrix_test = confusion_matrix(y_test, predictions_test)
-confusion_matrix_train = confusion_matrix(y_train, predictions_train)
-confusion_matrix_oot = confusion_matrix(df_oot_2['churn'], predictions_submit)
-
-# Print or use the F1-scores and confusion matrices
-print("F1-score (Test):", f1_score_test)
-print("F1-score (Train):", f1_score_train)
-print("F1-score (OOT):", f1_score_oot)
-print("Confusion Matrix (Test):\n", confusion_matrix_test)
-print("Confusion Matrix (Train):\n", confusion_matrix_train)
-print("Confusion Matrix (oot):\n", confusion_matrix_oot)
 
 # %%
 df_oot_2.shape
@@ -1469,6 +1266,36 @@ grouped_counts['variable'] = 'day_of_last_rech_quintile'  # Change 'arpu_quintil
 
 # Display the result
 grouped_counts
+
+using Pkg
+Pkg.add("MLJ")
+Pkg.add("MLJModels")
+Pkg.add("DataFrames")
+Pkg.add("CSV")
+
+
+using MLJModels
+
+# Elegir el modelo
+modelo = @load LinearRegressor pkg=GLM
+
+# Dividir los datos
+train, test = partition(eachindex(y), 0.7, shuffle=true) # 70% para entrenamiento
+
+# Entrenar el modelo
+modelo_entrenado = machine(modelo, X[train, :], y[train])
+fit!(modelo_entrenado)
+
+
+# Predecir con los datos de prueba
+predicciones = predict(modelo_entrenado, X[test, :])
+
+# Calcular métricas de evaluación, como el error cuadrático medio (MSE)
+mse = mean((predicciones .- y[test]).^
+
+
+
+
 
 # %% [markdown]
 # ![image.png](attachment:image.png)
