@@ -1,0 +1,5 @@
+lightgbm == 4.1.0
+optuna == 3.3.0
+pycaret == 3.3.0
+
+# TODO pandas, seaborn, matplotlib y otras no está en el requirements.txt
